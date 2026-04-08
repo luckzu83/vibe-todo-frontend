@@ -1,8 +1,6 @@
 /**
- * Vercel Serverless: 브라우저는 같은 출처 `/api/todos`만 호출하고,
- * 여기서 TODO_API_BASE_URL(실제 공개 API)로 요청을 넘깁니다. CORS 없음.
- * Vercel → Project → Settings → Environment Variables → TODO_API_BASE_URL
- * 예: https://your-api.onrender.com/todos
+ * Vercel Serverless — vercel.json 이 /api/todos → 이 파일로 넘김
+ * 환경 변수: TODO_API_BASE_URL (예: https://your-api.com/todos)
  */
 
 const HOP_BY_HOP = new Set([
@@ -27,17 +25,22 @@ function readBody(req) {
 
 function buildTargetUrl(req, backendBase) {
   const base = backendBase.replace(/\/$/, '')
-  const raw = req.query.slug
-  const parts =
-    raw === undefined || raw === null
-      ? []
-      : Array.isArray(raw)
-        ? raw
-        : [raw]
-  const suffix = parts.map(String).filter(Boolean).join('/')
-  const path = suffix ? `${base}/${suffix}` : base
+  const rawPath = req.query.path
+  const tail =
+    rawPath === undefined || rawPath === null
+      ? ''
+      : Array.isArray(rawPath)
+        ? rawPath.join('/')
+        : String(rawPath)
+  const segments = tail.split('/').filter(Boolean)
+  const suffix = segments.map(encodeURIComponent).join('/')
+  const upstreamPath = suffix ? `${base}/${suffix}` : base
+
   const url = new URL(req.url || '/', 'http://localhost')
-  return path + url.search
+  const searchParams = new URLSearchParams(url.search)
+  searchParams.delete('path')
+  const qs = searchParams.toString()
+  return qs ? `${upstreamPath}?${qs}` : upstreamPath
 }
 
 export default async function handler(req, res) {
