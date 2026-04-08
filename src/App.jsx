@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  apiBaseUrl,
   createTodo,
   fetchTodos,
+  isApiConfigured,
   removeTodo,
   updateTodo,
 } from './api/todos'
@@ -17,6 +19,8 @@ function App() {
   const [editingId, setEditingId] = useState(null)
   const [editDraft, setEditDraft] = useState('')
   const [busyIds, setBusyIds] = useState(() => new Set())
+
+  const apiReady = isApiConfigured()
 
   const withBusy = useCallback(async (id, fn) => {
     setBusyIds((prev) => new Set(prev).add(id))
@@ -129,9 +133,13 @@ function App() {
       <header className="app-header">
         <h1 className="app-title">할 일</h1>
         <p className="app-sub">
-          서버:{' '}
+          API:{' '}
           <code className="app-code">
-            {import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/todos'}
+            {apiReady
+              ? apiBaseUrl
+              : import.meta.env.PROD
+                ? 'VITE_API_BASE_URL 미설정'
+                : apiBaseUrl}
           </code>
         </p>
       </header>
@@ -148,10 +156,14 @@ function App() {
           maxLength={500}
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
-          disabled={adding}
+          disabled={adding || !apiReady}
           autoComplete="off"
         />
-        <button className="btn btn-primary" type="submit" disabled={adding}>
+        <button
+          className="btn btn-primary"
+          type="submit"
+          disabled={adding || !apiReady}
+        >
           {adding ? '추가 중…' : '추가'}
         </button>
       </form>
