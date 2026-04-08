@@ -1,8 +1,35 @@
+function isLoopbackApiUrl(url) {
+  try {
+    const u = new URL(url)
+    const h = u.hostname.toLowerCase()
+    return (
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === '0.0.0.0' ||
+      h === '[::1]'
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 프로덕션: 공개 API URL(VITE) 또는 Vercel 프록시 `/api/todos`
+ * VITE에 127.0.0.1/localhost가 박혀 있으면 무시하고 프록시 사용
+ */
 function resolveApiBase() {
   const envUrl = import.meta.env.VITE_API_BASE_URL?.trim()
-  if (envUrl) return envUrl.replace(/\/$/, '')
-  if (import.meta.env.DEV) return 'http://localhost:5001/todos'.replace(/\/$/, '')
-  return ''
+  if (envUrl) {
+    const normalized = envUrl.replace(/\/$/, '')
+    if (import.meta.env.PROD && isLoopbackApiUrl(normalized)) {
+      return '/api/todos'
+    }
+    return normalized
+  }
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5001/todos'.replace(/\/$/, '')
+  }
+  return '/api/todos'
 }
 
 const API_BASE = resolveApiBase()
@@ -14,12 +41,12 @@ export function isApiConfigured() {
 }
 
 export const missingApiUrlMessage =
-  '배포 환경에서 API 주소가 없습니다. Vercel(또는 호스팅) 환경 변수에 VITE_API_BASE_URL을 설정하세요. 예: https://api.example.com/todos — 127.0.0.1·localhost는 방문자 본인 PC를 가리키므로 배포 사이트에서는 동작하지 않습니다.'
+  'API 주소를 확인할 수 없습니다. Vercel에는 TODO_API_BASE_URL(서버 전용)을 설정하고, 브라우저용 VITE_API_BASE_URL에는 127.0.0.1 대신 공개 HTTPS 주소를 쓰거나 비워 두세요.'
 
 function assertApiBase() {
   if (!API_BASE) {
     throw new Error(
-      import.meta.env.PROD ? missingApiUrlMessage : 'VITE_API_BASE_URL이 비어 있습니다.',
+      import.meta.env.PROD ? missingApiUrlMessage : 'API 베이스 URL이 비어 있습니다.',
     )
   }
 }

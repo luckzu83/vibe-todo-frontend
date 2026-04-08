@@ -136,9 +136,11 @@ function App() {
           API:{' '}
           <code className="app-code">
             {apiReady
-              ? apiBaseUrl
+              ? apiBaseUrl.startsWith('/')
+                ? `${apiBaseUrl} (같은 사이트 프록시)`
+                : apiBaseUrl
               : import.meta.env.PROD
-                ? 'VITE_API_BASE_URL 미설정'
+                ? '설정 필요'
                 : apiBaseUrl}
           </code>
         </p>
