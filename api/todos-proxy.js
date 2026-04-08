@@ -1,6 +1,9 @@
 /**
  * Vercel Serverless — vercel.json 이 /api/todos → 이 파일로 넘김
- * 환경 변수: TODO_API_BASE_URL (예: https://your-api.com/todos)
+ *
+ * 백엔드 베이스(…/todos 까지)는 아래 순서로 찾습니다. localhost/127.0.0.1 은 무시합니다.
+ * TODO_API_BASE_URL → TODOS_API_BASE_URL → API_BASE_URL → VITE_API_BASE_URL
+ * (Vercel은 빌드용 VITE_* 도 서버리스 런타임에 주입하므로, 공개 URL만 넣었다면 재사용됩니다.)
  */
 
 const HOP_BY_HOP = new Set([
@@ -13,6 +16,38 @@ const HOP_BY_HOP = new Set([
   'transfer-encoding',
   'upgrade',
 ])
+
+function isLoopbackUrl(url) {
+  try {
+    const u = new URL(url)
+    const h = u.hostname.toLowerCase()
+    return (
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === '0.0.0.0' ||
+      h === '[::1]'
+    )
+  } catch {
+    return true
+  }
+}
+
+function resolveBackendBase() {
+  const keys = [
+    'TODO_API_BASE_URL',
+    'TODOS_API_BASE_URL',
+    'API_BASE_URL',
+    'VITE_API_BASE_URL',
+  ]
+  for (const key of keys) {
+    const raw = process.env[key]?.trim()
+    if (!raw) continue
+    const normalized = raw.replace(/\/$/, '')
+    if (isLoopbackUrl(normalized)) continue
+    return normalized
+  }
+  return ''
+}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -44,11 +79,13 @@ function buildTargetUrl(req, backendBase) {
 }
 
 export default async function handler(req, res) {
-  const backendBase = process.env.TODO_API_BASE_URL?.trim()
+  const backendBase = resolveBackendBase()
   if (!backendBase) {
     res.status(503).json({
       error:
-        'TODO_API_BASE_URL is not set. Add it in Vercel Environment Variables (e.g. https://your-api.com/todos).',
+        '백엔드 API 주소가 설정되지 않았습니다. Vercel → Settings → Environment Variables 에 다음 중 하나를 추가하세요: TODO_API_BASE_URL (권장) 또는 공개 HTTPS 주소가 들어 있는 VITE_API_BASE_URL. 값 예: https://your-api.onrender.com/todos — localhost·127.0.0.1 은 Vercel 서버에서 접근할 수 없습니다.',
+      errorEn:
+        'Set TODO_API_BASE_URL (or a public VITE_API_BASE_URL) in Vercel env to your API base ending in /todos. Redeploy after saving.',
     })
     return
   }
